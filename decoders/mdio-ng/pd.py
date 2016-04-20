@@ -41,19 +41,19 @@ class Decoder(srd.Decoder):
         "default": "no", "values": ("yes", "no")},
     )
     annotations = (
-        ("mdio-bit-val", "MDIO bit value"),
-        ("mdio-bit-num", "MDIO bit number"),
-        ("mdio-frame", "MDIO frame"),
-        ("mdio-frame-idle", "MDIO bus idle state"),
-        ("mdio-frame-error", "MDIO frame error"),
-        ("mdio-decode", "MDIO decode"),
+        ("mdio-bit-val", "Bit value"),
+        ("mdio-bit-num", "Bit number"),
+        ("mdio-frame", "Frame"),
+        ("mdio-frame-idle", "Bus idle state"),
+        ("mdio-frame-error", "Frame error"),
+        ("mdio-decode", "Decode"),
     )
     annotation_rows = (
-        ("mdio-bit-val", "MDIO bit value", (0,)),
-        ("mdio-bit-num", "MDIO bit number", (1,)),
-        ("mdio-frame", "MDIO frame", (2,3,)),
-        ("mdio-frame-error", "MDIO frame error", (4,)),
-        ("mdio-decode", "MDIO decode", (5,)),
+        ("mdio-bit-val", "Bit value", (0,)),
+        ("mdio-bit-num", "Bit number", (1,)),
+        ("mdio-frame", "Frame", (2,3,)),
+        ("mdio-frame-error", "Frame error", (4,)),
+        ("mdio-decode", "Decode", (5,)),
     )
 
     def __init__(self):
@@ -88,13 +88,19 @@ class Decoder(srd.Decoder):
 
             if self.clause45 and self.opcode > 1 or (not self.clause45 and self.opcode):
                 decoded_min += str.format("READ:  %04X" % self.data)
+                is_read = 1
             else:
                 decoded_min += str.format("WRITE: %04X" % self.data)
+                is_read = 0
             decoded_ext = str.format(" %s: %02d" % ("PRTAD" if self.clause45 else "PHYAD", self.portad))
             decoded_ext += str.format(" %s: %02d" % ("DEVAD" if self.clause45 else "REGAD", self.devad))
             if self.ta_invalid or self.op_invalid:
                 decoded_ext += " ERROR"
             self.put(self.ss_frame, self.mdiobits[0][2], self.out_ann, [5, [decoded_min + decoded_ext, decoded_min]])
+
+            # For the next PD
+            self.put(self.ss_frame, self.mdiobits[0][2], self.out_python, [(bool(self.clause45), int(self.clause45_address), \
+            bool(is_read), int(self.portad), int(self.devad), int(self.data))])
 
         # Post read increment address
         if self.clause45 and self.opcode == 2 and self.clause45_address != -1:
@@ -211,9 +217,9 @@ class Decoder(srd.Decoder):
         if self.devad == -1:
             self.devad = 0
             if self.clause45:
-                prtad = ["PRTAD: %d" % self.portad, "PRT", "P"]
+                prtad = ["PRTAD: %02d" % self.portad, "PRT", "P"]
             else:
-                prtad = ["PHYAD: %d" % self.portad, "PHY", "P"]
+                prtad = ["PHYAD: %02d" % self.portad, "PHY", "P"]
             self.put(self.ss_frame_field, self.samplenum, self.out_ann, [2, prtad])
             self.ss_frame_field = self.samplenum
         self.devad_bits -= 1
@@ -225,9 +231,9 @@ class Decoder(srd.Decoder):
         if self.ta_invalid == -1:
             self.ta_invalid = ""
             if self.clause45:
-                regad = ["DEVAD: %d" % self.devad, "DEV", "D"]
+                regad = ["DEVAD: %02d" % self.devad, "DEV", "D"]
             else:
-                regad = ["REGAD: %d" % self.devad, "REG", "R"]
+                regad = ["REGAD: %02d" % self.devad, "REG", "R"]
             self.put(self.ss_frame_field, self.samplenum, self.out_ann, [2, regad])
             self.ss_frame_field = self.samplenum
             if mdio != 1 and ((self.clause45 and self.opcode < 2)
