@@ -303,3 +303,11 @@ class Decoder(srd.Decoder):
 
             # Found the correct clock edge, now get/handle the bit(s).
             self.handle_bit(pins[1])
+
+    def decode_v3(self):
+        while True:
+            # Wait for a rising edge on MDC.
+            mdc, mdio = self.wait([{0: 'r'}])
+
+            # Found the correct clock edge, now get/handle the bit(s).
+            self.handle_bit(mdio)
